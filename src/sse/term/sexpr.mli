@@ -85,7 +85,8 @@ module Model : sig
 
   val eval :
     ?symbols:(Expr.t -> Bitvector.t) ->
-    ?memory:(Memory.t -> Bitvector.t -> char) ->
+    ?memory:
+      (Memory.t -> Bitvector.t -> int -> Machine.endianness -> Bitvector.t) ->
     t ->
     Expr.t ->
     Bv.t

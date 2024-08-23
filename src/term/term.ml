@@ -1082,18 +1082,17 @@ module Make (A : Sigs.HASHABLE) (B : Sigs.HASHABLE) :
         let size = sizeof x in
         unary (Sext size) (unary (Restrict { hi = size - 1; lo = size - 1 }) x)
     (* factorisation *)
-    | Plus, a, b when compare a b = 0 ->
-        binary Mul a (constant (Bv.of_int ~size:(sizeof a) 2)) sx
+    | Plus, a, b when compare a b = 0 -> binary Lsl a (constant (Bv.ones sx)) sx
     (* commutativity -- keep sorted *)
     (* special cases for + - *)
-    | Plus, a, Binary { f = Minus; x = b; y = c; _ } when compare a b < 0 ->
+    | Plus, Binary { f = Minus; x = a; y = b; _ }, c when compare b c <= 0 ->
         binary Minus (binary Plus b a sx) c sx
     | Plus, Binary { f = Minus; x = a; y = b; _ }, c when compare b c < 0 ->
         binary Minus (binary Plus a c sx) b sx
     | Plus, Binary { f = Minus; _ }, c -> mk_binary Plus x c
-    | Minus, Binary { f = Plus; x = a; y = b; _ }, c when compare b c < 0 ->
+    | Minus, Binary { f = Plus; x = a; y = b; _ }, c when compare b c <= 0 ->
         binary Plus (binary Minus a c sx) b sx
-    | Minus, Binary { f = Minus; x = a; y = b; _ }, c when compare b c < 0 ->
+    | Minus, Binary { f = Minus; x = a; y = b; _ }, c when compare b c <= 0 ->
         binary Minus (binary Minus a c sx) b sx
     | Plus, Unary { f = Minus; x = a; _ }, b -> binary Minus b a sx
     (* generic chained *)

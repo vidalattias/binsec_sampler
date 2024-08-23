@@ -5,7 +5,7 @@
 
 (name binsec)
 
-(version "0.8.1")
+(version 34e2897)
 (maintainers "BINSEC <binsec@saxifrage.saclay.cea.fr>")
 (authors
   "Adel Djoudi"

@@ -512,7 +512,7 @@ let assign lhs rhs lo hi =
   let bytesize = Natural.to_int Basic_types.Constants.bytesize in
   match lhs with
   | LValue.Store (sz, endian, e, _)
-    when lo mod bytesize = 0 && hi mod bytesize = bytesize - 1 ->
+    when lo land (bytesize - 1) = 0 && hi land (bytesize - 1) = bytesize - 1 ->
       let sz' = Size.(Byte.of_bitsize (Bit.create (hi - lo + 1))) in
       let o' =
         match endian with
@@ -524,7 +524,7 @@ let assign lhs rhs lo hi =
       in
       let lval = LValue.store sz' endian e' in
       Predba.assign lval rhs
-  | LValue.Store (sz, endian, e, _) when lo mod bytesize = 0 ->
+  | LValue.Store (sz, endian, e, _) when lo land (bytesize - 1) = 0 ->
       let top =
         Expr.(
           restrict (hi + 1)
@@ -533,7 +533,8 @@ let assign lhs rhs lo hi =
       in
       let rhs = Expr.append top rhs in
       Predba.assign lhs rhs
-  | LValue.Store (sz, endian, e, _) when hi mod bytesize = bytesize - 1 ->
+  | LValue.Store (sz, endian, e, _) when hi land (bytesize - 1) = bytesize - 1
+    ->
       let bot =
         Expr.(restrict 0 (lo - 1) (load (Size.Byte.create sz) endian e))
       in
@@ -1333,7 +1334,7 @@ let lift_palignr xmm mm ~dst ~src imm sreg =
   [ assign_xmm_expr dst 0 hi restricted xmm mm sreg ]
 
 let lift_enter mode alloc level =
-  let level = level mod 32 in
+  let level = level land (32 - 1) in
   let nbytes = nbytes_mode mode and nbits = size_mode mode in
   let tail =
     assign_register EBP mode (expr_of_reg mode ESP)
@@ -1598,35 +1599,24 @@ let lift_cwd mode =
   ]
 
 let lift_bsr mode dst src sreg =
-  let open Dba_types in
   let src_exp = disas_expr src mode sreg in
   let dst_lhs = lhs_of_reg dst mode in
   let size = match mode with `M32 -> 31 | `M16 -> 15 | `M8 -> assert false in
   let open Dba.Expr in
   let sz = size + 1 in
   let bits = Size.Bit.create sz in
-  let tmp = temp_size sz in
-  let cpt = cpt_size sz in
-  let temp_lhs = Dba.LValue.temporary tmp bits in
-  let temp_exp = temporary tmp ~size:sz in
-  let cpt_lhs = Dba.LValue.temporary cpt bits in
-  let cpt_exp = temporary cpt ~size:sz in
-  let extone = cst_of_int 1 sz in
+  let rec bsr_aux sz src exp i =
+    if i = sz then exp
+    else bsr_aux sz src (ite (restrict i i src) (cst_of_int i sz) exp) (i + 1)
+  in
+
+  let bsr sz src udef = bsr_aux sz src udef 0 in
+  let udef = Dba.LValue.temporary (temp_size sz) bits in
+  let res = bsr sz src_exp (Dba.LValue.to_expr udef) in
   [
-    Predba.conditional_jump (diff src_exp (zeros sz)) (Dba.JInner 4);
-    assign_flag ZF (cst_of_int 1 1);
-    Predba.undefined dst_lhs;
-    Predba.static_jump (Dba.JInner 12);
-    assign_flag ZF zero;
-    Predba.assign temp_lhs src_exp;
-    Predba.assign cpt_lhs (cst_of_int size (size + 1));
-    Predba.conditional_jump
-      Expr.(equal (bit_restrict size temp_exp) bool_true)
-      (Dba.JInner 11);
-    Predba.assign temp_lhs (shift_left temp_exp extone);
-    Predba.assign cpt_lhs (sub cpt_exp extone);
-    Predba.static_jump (Dba.JInner 7);
-    Predba.assign dst_lhs cpt_exp;
+    Predba.undefined udef;
+    assign_flag ZF (equal src_exp (zeros sz));
+    Predba.assign dst_lhs res;
   ]
   @ undef_flags [ CF; OF; SF ]
 
@@ -1634,31 +1624,23 @@ let lift_bsf mode dst src sreg =
   let src_exp = disas_expr src mode sreg in
   let dst_lhs = lhs_of_reg dst mode in
   let size = match mode with `M32 -> 31 | `M16 -> 15 | `M8 -> assert false in
-  let open Dba in
+  let open Dba.Expr in
   let sz = size + 1 in
   let bits = Size.Bit.create sz in
-  let tmp = temp_size sz in
-  let cpt = cpt_size sz in
-  let temp_lhs = Dba.LValue.temporary tmp bits in
-  let temp_exp = Expr.temporary tmp ~size:sz in
-  let cpt_lhs = Dba.LValue.temporary cpt bits in
-  let cpt_exp = Expr.temporary cpt ~size:sz in
-  let zeros = Expr.zeros sz in
+  let rec bsf_aux sz src exp i =
+    if i = 0 then exp
+    else
+      let i' = i - 1 in
+      bsf_aux sz src (ite (restrict i' i' src) (cst_of_int i' sz) exp) i'
+  in
+
+  let bsf sz src udef = bsf_aux sz src udef sz in
+  let udef = Dba.LValue.temporary (temp_size sz) bits in
+  let res = bsf sz src_exp (Dba.LValue.to_expr udef) in
   [
-    Predba.conditional_jump (Expr.diff src_exp zeros) (Dba.JInner 4);
-    Predba.assign (lhs_of_flag ZF) (cst_of_int 1 1);
-    Predba.undefined dst_lhs;
-    Predba.static_jump (Dba.JInner 12);
-    Predba.assign (lhs_of_flag ZF) Dba_types.Expr.bool_false;
-    Predba.assign temp_lhs src_exp;
-    Predba.assign cpt_lhs zeros;
-    Predba.conditional_jump
-      Expr.(equal (bit_restrict 0 temp_exp) Dba_types.Expr.bool_true)
-      (Dba.JInner 11);
-    Predba.assign temp_lhs (Expr.shift_right temp_exp (cst_of_int 1 sz));
-    Predba.assign cpt_lhs (Expr.add cpt_exp (cst_of_int 1 sz));
-    Predba.static_jump (Dba.JInner 7);
-    Predba.assign dst_lhs cpt_exp;
+    Predba.undefined udef;
+    assign_flag ZF (equal src_exp (zeros sz));
+    Predba.assign dst_lhs res;
   ]
   @ undef_flags [ CF; OF; SF ]
 
@@ -2127,7 +2109,7 @@ let lift_btX ~sreg mode base offset =
       let base_expr = disas_expr base mode sreg in
       match offset with
       | Imm i ->
-          let i = Int64.to_int i mod size in
+          let i = Int64.to_int i land (size - 1) in
           let bit_select = Expr.bit_restrict i base_expr in
           (bit_select, bit_select, Expr.one)
       | Reg _ ->
@@ -2151,10 +2133,11 @@ let lift_btX ~sreg mode base offset =
       match offset with
       | Imm i ->
           let i = Int64.to_int i in
-          let off = bytesize * (i / size) and pos = i mod size in
-          let base_expr =
-            expr_of_mem mode ~sreg (Expr.add base_addr (const_addr off))
-          in
+          let off =
+            Expr.(
+              mul (const_addr bytesize) (udiv (const_addr i) (const_addr size)))
+          and pos = i land (size - 1) in
+          let base_expr = expr_of_mem mode ~sreg (Expr.add base_addr off) in
           let bit_mask = const_expr (1 lsl pos) in
           (Expr.bit_restrict pos base_expr, base_expr, bit_mask)
       | Reg _ ->

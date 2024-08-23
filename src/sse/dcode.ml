@@ -736,20 +736,14 @@ end = struct
                    kind = Store { base; dir; addr; rval };
                    succ = vertex + succ;
                  })
-        | Undef (Var var, succ) ->
+        | Nondet (Var var, succ) | Undef (Var var, succ) ->
             if var.info = Var.Tag.Temp then temps := Var.Set.add var !temps;
-            add_node t cur
-              (Fallthrough { kind = Clobber var; succ = vertex + succ })
-        | Undef _ ->
-            raise
-              (Invalid_argument
-                 (Format.asprintf "unexpected instruction kind %a"
-                    Dba_printer.Ascii.pp_instruction inst))
-        | Nondet (Var var, succ) ->
-            if var.info = Var.Tag.Temp then temps := Var.Set.add var !temps;
-            add_node t cur
-              (Fallthrough { kind = Symbolize var; succ = vertex + succ })
-        | Nondet (Restrict (var, { hi; lo }), succ) ->
+            let kind =
+              match inst with Nondet _ -> Symbolize var | _ -> Clobber var
+            in
+            add_node t cur (Fallthrough { kind; succ = vertex + succ })
+        | Nondet (Restrict (var, { hi; lo }), succ)
+        | Undef (Restrict (var, { hi; lo }), succ) ->
             if var.info = Var.Tag.Temp then temps := Var.Set.add var !temps;
             let size' = hi - lo + 1 in
             let name' = entropy size' in
@@ -758,17 +752,24 @@ end = struct
             let rval = Dba_utils.Expr.complement (Expr.v var') ~lo ~hi var in
             let succ' = !next in
             incr next;
-            add_node t cur (Fallthrough { kind = Symbolize var'; succ = succ' });
+            let kind =
+              match inst with Nondet _ -> Symbolize var' | _ -> Clobber var'
+            in
+            add_node t cur (Fallthrough { kind; succ = succ' });
             add_node t succ'
               (Fallthrough { kind = Assign { var; rval }; succ = vertex + succ })
-        | Nondet (Store (bytes, dir, addr, base), succ) ->
+        | Nondet (Store (bytes, dir, addr, base), succ)
+        | Undef (Store (bytes, dir, addr, base), succ) ->
             let size' = 8 * bytes in
             let name' = entropy size' in
             let var' = Dba.Var.temporary name' (Size.Bit.create size') in
             let rval = Expr.v var' in
             let succ' = !next in
             incr next;
-            add_node t cur (Fallthrough { kind = Symbolize var'; succ = succ' });
+            let kind =
+              match inst with Nondet _ -> Symbolize var' | _ -> Clobber var'
+            in
+            add_node t cur (Fallthrough { kind; succ = succ' });
             add_node t succ'
               (Fallthrough
                  {

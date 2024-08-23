@@ -543,12 +543,9 @@ module Make
       | _ -> Bv.rand (Expr.sizeof e)
     else State.get_a_value e state
 
-  and cv_memory state array addr =
+  and cv_memory state array addr len dir =
     let open Sexpr in
-    Bv.to_char
-      (State.get_a_value
-         (Expr.load 1 LittleEndian (Expr.constant addr) array)
-         state)
+    State.get_a_value (Expr.load len dir (Expr.constant addr) array) state
 
   let extract_cv_report (ct_state : Ct_state.t) symbols state
       ((_, _, main, arrays, addr_size) as model) : Report.t =
