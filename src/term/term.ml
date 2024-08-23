@@ -1011,13 +1011,13 @@ module Make (A : Sigs.HASHABLE) (B : Sigs.HASHABLE) :
     | _, _ -> mk_unary f x
 
   and binary f x y sx =
+    let () = Printf.printf "Hello" in
     match (f, x, y) with
     (* safety pattern guard *)
     (* TODO: move outside of the rec pattern if the rewriter is trusted *)
     (* | _, _, _ when f <> Concat && sizeof x <> sizeof y -> *)
     (*     abort @@ mk_binary f x y *)
-    (* special boolean replacement *)
-    | (Plus, _, _ | Minus, _, _) when sx = 1 -> binary Xor x y sx
+    (* special boolean replacement *) 
     (* constant folding *)
     | _, Cst x, Cst y -> constant (Bv.binary f x y)
     | Plus, Binary { f = Plus; x = a; y = Cst b; _ }, Cst c ->
