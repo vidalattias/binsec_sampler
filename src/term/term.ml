@@ -1081,8 +1081,7 @@ module Make (A : Sigs.HASHABLE) (B : Sigs.HASHABLE) :
         let size = sizeof x in
         unary (Sext size) (unary (Restrict { hi = size - 1; lo = size - 1 }) x)
     (* factorisation *)
-    | Plus, a, b when compare a b = 0 ->
-      binary Lsl a (constant (Bv.ones sx)) sx
+    | Plus, a, b when compare a b = 0 ->binary Lsl a (constant (Bv.ones sx)) sx
     (* commutativity -- keep sorted *)
     (* special cases for + - *)
     | Plus, Binary { f = Minus; x = a; y = b; _ }, c when compare b c <= 0 ->
@@ -1093,7 +1092,7 @@ module Make (A : Sigs.HASHABLE) (B : Sigs.HASHABLE) :
         mk_binary Plus x c
     | Minus, Binary { f = Plus; x = a; y = b; _ }, c when compare b c <= 0 ->
         binary Plus (binary Minus a c sx) b sx
-    | Minus, Binary { f = Minus; x = a; y = b; _ }, c when compare b c <= 0 ->
+    | Minus, Binary { f = Minus; x = a; y = b; _ }, c when compare b c < 0 ->
         binary Minus (binary Minus a c sx) b sx
     | Plus, Unary { f = Minus; x = a; _ }, b -> binary Minus b a sx
     (* generic chained *)
