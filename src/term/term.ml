@@ -1085,13 +1085,19 @@ module Make (A : Sigs.HASHABLE) (B : Sigs.HASHABLE) :
     (* commutativity -- keep sorted *)
     (* special cases for + - *)
     | Plus, Binary { f = Minus; x = a; y = b; _ }, c when compare b c <= 0 ->
-        binary Minus (binary Plus b a sx) c sx
+      let () = Printf.printf "Plus Minus - 1\n" in
+      binary Minus (binary Plus b a sx) c sx
     | Plus, Binary { f = Minus; x = a; y = b; _ }, c when compare b c < 0 ->
+      let () = Printf.printf "Plus Minus - 2\n" in
         binary Minus (binary Plus a c sx) b sx
-    | Plus, Binary { f = Minus; _ }, c -> mk_binary Plus x c
+    | Plus, Binary { f = Minus; _ }, c -> 
+        let () = Printf.printf "Plus Minus - 3\n" in
+        mk_binary Plus x c
     | Minus, Binary { f = Plus; x = a; y = b; _ }, c when compare b c <= 0 ->
+      let () = Printf.printf "Plus Minus - 4\n" in
         binary Plus (binary Minus a c sx) b sx
     | Minus, Binary { f = Minus; x = a; y = b; _ }, c when compare b c <= 0 ->
+      let () = Printf.printf "Plus Minus - 5\n" in
         binary Minus (binary Minus a c sx) b sx
     | Plus, Unary { f = Minus; x = a; _ }, b -> binary Minus b a sx
     (* generic chained *)
