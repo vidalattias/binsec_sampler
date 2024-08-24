@@ -1011,7 +1011,6 @@ module Make (A : Sigs.HASHABLE) (B : Sigs.HASHABLE) :
     | _, _ -> mk_unary f x
 
   and binary f x y sx =
-    let () = Printf.printf "Hello" in
     match (f, x, y) with
     (* safety pattern guard *)
     (* TODO: move outside of the rec pattern if the rewriter is trusted *)
@@ -1082,7 +1081,7 @@ module Make (A : Sigs.HASHABLE) (B : Sigs.HASHABLE) :
         let size = sizeof x in
         unary (Sext size) (unary (Restrict { hi = size - 1; lo = size - 1 }) x)
     (* factorisation *)
-    | Plus, a, b when compare a b = 0 -> binary Lsl a (constant (Bv.ones sx)) sx
+    | Plus, a, b when compare a b = 0 -> let () = Printf.printf "PLUS a b (a == b)\n" in binary Lsl a (constant (Bv.ones sx)) sx
     (* commutativity -- keep sorted *)
     (* special cases for + - *)
     | Plus, Binary { f = Minus; x = a; y = b; _ }, c when compare b c <= 0 ->
