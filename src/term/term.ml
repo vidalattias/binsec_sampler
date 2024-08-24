@@ -1012,7 +1012,6 @@ module Make (A : Sigs.HASHABLE) (B : Sigs.HASHABLE) :
 
   and binary f x y sx =
     let () = Printf.printf "Hello" in
-    let () = failwith "nope" in
     match (f, x, y) with
     (* safety pattern guard *)
     (* TODO: move outside of the rec pattern if the rewriter is trusted *)
