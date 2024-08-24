@@ -1096,7 +1096,7 @@ module Make (A : Sigs.HASHABLE) (B : Sigs.HASHABLE) :
     | Minus, Binary { f = Plus; x = a; y = b; _ }, c when compare b c <= 0 ->
       let () = Printf.printf "Plus Minus - 4\n" in
         binary Plus (binary Minus a c sx) b sx
-    | Minus, Binary { f = Minus; x = a; y = b; _ }, c when compare b c <= 0 ->
+    | Minus, Binary { f = Minus; x = a; y = b; _ }, c when compare b c < 0 ->
       let () = Printf.printf "Plus Minus - 5\n" in
         binary Minus (binary Minus a c sx) b sx
     | Plus, Unary { f = Minus; x = a; _ }, b -> binary Minus b a sx
