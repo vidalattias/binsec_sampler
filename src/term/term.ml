@@ -232,6 +232,16 @@ let rec pp : type k. Format.formatter -> (k, 'a, 'b) t -> unit =
       Format.fprintf ppf "@[(%a %a %a)@]" Op.pp f pp x pp y
   | Ite { c; t; e; _ } -> Format.fprintf ppf "@[(%a ? %a : %a)@]" pp c pp t pp e
 
+  let rec custom_pp : type k. Format.formatter -> (k, 'a, 'b) t -> unit =
+    fun ppf -> function
+     | Var _ -> Format.fprintf ppf "X"
+     | Load _ -> Format.fprintf ppf "X"
+     | Cst bv -> Bitvector.pp_hex_or_bin ppf bv
+     | Unary { f; x; _ } -> Format.fprintf ppf "@[(%a %a)@]" Op.pp f custom_pp x
+     | Binary { f; x; y; _ } ->
+         Format.fprintf ppf "@[(%a %a %a)@]" Op.pp f custom_pp x custom_pp y
+     | Ite { c; t; e; _ } -> Format.fprintf ppf "@[(%a ? %a : %a)@]" custom_pp c custom_pp t custom_pp e
+
 let to_string t = Format.asprintf "%a" pp t
 let abort t = raise (Invalid_argument (to_string t))
 
@@ -1016,7 +1026,8 @@ module Make (A : Sigs.HASHABLE) (B : Sigs.HASHABLE) :
     (* TODO: move outside of the rec pattern if the rewriter is trusted *)
     (* | _, _, _ when f <> Concat && sizeof x <> sizeof y -> *)
     (*     abort @@ mk_binary f x y *)
-    (* special boolean replacement *) 
+    (* special boolean replacement *)
+    | (Plus, _, _ | Minus, _, _) when sx = 1 -> binary Xor x y sx
     (* constant folding *)
     | _, Cst x, Cst y -> constant (Bv.binary f x y)
     | Plus, Binary { f = Plus; x = a; y = Cst b; _ }, Cst c ->
@@ -1081,16 +1092,16 @@ module Make (A : Sigs.HASHABLE) (B : Sigs.HASHABLE) :
         let size = sizeof x in
         unary (Sext size) (unary (Restrict { hi = size - 1; lo = size - 1 }) x)
     (* factorisation *)
-    | Plus, a, b when compare a b = 0 ->binary Lsl a (constant (Bv.ones sx)) sx
+    | Plus, a, b when compare a b = 0 ->
+        binary Mul a (constant (Bv.of_int ~size:(sizeof a) 2)) sx
     (* commutativity -- keep sorted *)
     (* special cases for + - *)
-    | Plus, Binary { f = Minus; x = a; y = b; _ }, c when compare b c <= 0 ->
-      binary Minus (binary Plus b a sx) c sx
+    | Plus, a, Binary { f = Minus; x = b; y = c; _ } when compare a b < 0 ->
+        binary Minus (binary Plus b a sx) c sx
     | Plus, Binary { f = Minus; x = a; y = b; _ }, c when compare b c < 0 ->
         binary Minus (binary Plus a c sx) b sx
-    | Plus, Binary { f = Minus; _ }, c -> 
-        mk_binary Plus x c
-    | Minus, Binary { f = Plus; x = a; y = b; _ }, c when compare b c <= 0 ->
+    | Plus, Binary { f = Minus; _ }, c -> mk_binary Plus x c
+    | Minus, Binary { f = Plus; x = a; y = b; _ }, c when compare b c < 0 ->
         binary Plus (binary Minus a c sx) b sx
     | Minus, Binary { f = Minus; x = a; y = b; _ }, c when compare b c < 0 ->
         binary Minus (binary Minus a c sx) b sx
