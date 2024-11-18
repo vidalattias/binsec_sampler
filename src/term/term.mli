@@ -326,4 +326,5 @@ val to_cst_exn : (_, _, _) t -> ([ `Cst ], _, _) t
 
 val pp : Format.formatter -> _ t -> unit
 val custom_pp : Format.formatter -> _ t -> unit
+val custom_pp_anonymous : Format.formatter -> _ t -> unit
 (** {5 Debug} **)

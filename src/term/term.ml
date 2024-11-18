@@ -232,15 +232,27 @@ let rec pp : type k. Format.formatter -> (k, 'a, 'b) t -> unit =
       Format.fprintf ppf "@[(%a %a %a)@]" Op.pp f pp x pp y
   | Ite { c; t; e; _ } -> Format.fprintf ppf "@[(%a ? %a : %a)@]" pp c pp t pp e
 
-  let rec custom_pp : type k. Format.formatter -> (k, 'a, 'b) t -> unit =
+  let rec custom_pp_anonymous : type k. Format.formatter -> (k, 'a, 'b) t -> unit =
     fun ppf -> function
      | Var _ -> Format.fprintf ppf "X"
      | Load _ -> Format.fprintf ppf "X"
      | Cst bv -> Bitvector.pp_hex_or_bin ppf bv
-     | Unary { f; x; _ } -> Format.fprintf ppf "@[(%a %a)@]" Op.pp f custom_pp x
+     | Unary { f; x; _ } -> Format.fprintf ppf "@[(%a %a)@]" Op.pp f custom_pp_anonymous x
      | Binary { f; x; y; _ } ->
-         Format.fprintf ppf "@[(%a %a %a)@]" Op.pp f custom_pp x custom_pp y
-     | Ite { c; t; e; _ } -> Format.fprintf ppf "@[(%a ? %a : %a)@]" custom_pp c custom_pp t custom_pp e
+         Format.fprintf ppf "@[(%a %a %a)@]" Op.pp f custom_pp_anonymous x custom_pp_anonymous y
+     | Ite { c; t; e; _ } -> Format.fprintf ppf "@[(%a ? %a : %a)@]" custom_pp_anonymous c custom_pp_anonymous t custom_pp_anonymous e
+
+
+  let rec custom_pp : type k. Format.formatter -> (k, 'a, 'b) t -> unit =
+  fun ppf -> function
+    | Var { name; size; _ } -> Format.fprintf ppf "%s<%d>" name size
+    | Load { len; dir; addr; _ } ->
+      Format.fprintf ppf "%@[%a]%d%a" pp addr len pp_endiannesss dir
+    | Cst bv -> Bitvector.pp_hex_or_bin ppf bv
+    | Unary { f; x; _ } -> Format.fprintf ppf "@[(%a %a)@]" Op.pp f custom_pp x
+    | Binary { f; x; y; _ } ->
+        Format.fprintf ppf "@[(%a %a %a)@]" Op.pp f custom_pp x custom_pp y
+    | Ite { c; t; e; _ } -> Format.fprintf ppf "@[(%a ? %a : %a)@]" custom_pp c custom_pp t custom_pp e
 
 let to_string t = Format.asprintf "%a" pp t
 let abort t = raise (Invalid_argument (to_string t))
